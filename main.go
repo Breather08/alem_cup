@@ -2,11 +2,12 @@ package main
 
 import (
 	"fmt"
-	"github.com/bradfitz/slice"
 	"io/ioutil"
 	"log"
 	"math"
 	"strings"
+
+	"github.com/bradfitz/slice"
 )
 
 type Tile struct {
@@ -24,13 +25,13 @@ var maxY = 10
 func (t *Tile) setCostDistance() {
 	t.CostDistance = t.cost + t.distance
 }
-// Manhattan
+
 func (t *Tile) setDistance(targetX, targetY int) {
 	t.distance = int(math.Abs(float64(targetX-t.X)) + math.Abs(float64(targetY-t.Y)))
 }
 
 func getPossibleTiles(gameMap []string, currentTile, targetTile *Tile) []*Tile {
-	// currentTile.setCostDistance()
+	// initialize 4 direction
 	tilesDir := []*Tile{
 		&Tile{X: currentTile.X, Y: currentTile.Y - 1, cost: currentTile.cost + 1, Parent: currentTile},
 		&Tile{X: currentTile.X, Y: currentTile.Y + 1, cost: currentTile.cost + 1, Parent: currentTile},
@@ -40,10 +41,16 @@ func getPossibleTiles(gameMap []string, currentTile, targetTile *Tile) []*Tile {
 
 	possible := []*Tile{}
 
+	// initialize possible directions
 	for _, tile := range tilesDir {
 		tile.setDistance(targetTile.X, targetTile.Y)
 		if (tile.X >= 0 && tile.X <= maxX) && (tile.Y >= 0 && tile.Y <= maxY) {
 			if gameMap[tile.Y][tile.X] == '.' || gameMap[tile.Y][tile.X] == ';' {
+				// meeting breakable box (spends 11-12 ticks, depending on position)
+				if gameMap[tile.Y][tile.X] == ';' {
+					tile.cost += 10
+				}
+				tile.setCostDistance()
 				possible = append(possible, tile)
 			}
 		}
@@ -83,40 +90,57 @@ func AStar() {
 		Y: 10,
 	}
 
-	// start.setDistance(finish.X, finish.Y)
+	start.setDistance(finish.X, finish.Y)
 
 	activeTiles := []*Tile{start}
 	visitedTiles := []*Tile{}
 
-	itest := 0
+	path := []string{}
 
 	for len(activeTiles) > 0 {
-		itest++
+
+		// Sorting tiles in stack to chose better option
 		slice.Sort(activeTiles, func(i, j int) bool {
 			return activeTiles[i].CostDistance < activeTiles[j].CostDistance
 		})
 
+		// Best option
 		var checkTile = activeTiles[0]
-		// fmt.Println(checkTile.X, ":", checkTile.Y)
-		
+
+		// Bim! Printing
 		if checkTile.X == finish.X && checkTile.Y == finish.Y {
 			var tile = checkTile
-			fmt.Println("Retracing steps backwards...")
-			for true {
-				fmt.Println(tile.X, ":", tile.Y)
-				// if mapArr[tile.Y][tile.X] == '.' || mapArr[tile.Y][tile.X] == ';' {
+			for tile != nil {
+				if mapArr[tile.Y][tile.X] == '.' {
 					var newMapRow = []rune(mapArr[tile.Y])
 					newMapRow[tile.X] = '*'
 					mapArr[tile.Y] = string(newMapRow)
-				// }
+				}
+				fmt.Println(tile.X, ":", tile.Y)
+				fmt.Println(tile.cost)
+				if tile.Parent != nil {
+					if tile.X > tile.Parent.X {
+						path = append([]string{"right"}, path...)
+					} else if tile.X < tile.Parent.X {
+						path = append([]string{"left"}, path...)
+					} else {
+						if tile.Y == tile.Parent.Y {
+							path = append([]string{"up"}, path...)
+						} else {
+							path = append([]string{"down"}, path...)
+						}
+					}
+				}
 				tile = tile.Parent
 				if tile == nil {
-					// fmt.Println("Map:")
-					for _,k := range mapArr {
+					for _, k := range mapArr {
 						fmt.Println(k)
 					}
 				}
 			}
+
+			fmt.Println(path)
+
 			return
 		}
 
@@ -124,19 +148,23 @@ func AStar() {
 		activeTiles = remove(activeTiles, checkTile)
 
 		possible := getPossibleTiles(mapArr, checkTile, finish)
+
+	// Creating label to be able to skip unnecessary counting
 	Loop:
 		for _, walkableTile := range possible {
+			// Prevent entering visited cell
 			for _, k := range visitedTiles {
 				if k.X == walkableTile.X && k.Y == walkableTile.Y {
 					continue Loop
 				}
 			}
 
+			// Check if new tile has better value
 			for _, k := range activeTiles {
 				if k.X == walkableTile.X && k.Y == walkableTile.Y {
 					existingTile := k
-					if existingTile.CostDistance < checkTile.CostDistance {
-						fmt.Println("hi")
+					if existingTile.CostDistance > checkTile.CostDistance {
+						// if so, just replace it
 						activeTiles = remove(activeTiles, existingTile)
 						activeTiles = append(activeTiles, walkableTile)
 						continue Loop
