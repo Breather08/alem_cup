@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"log"
 	"math"
+	"sort"
 	"strings"
 
 	"github.com/bradfitz/slice"
@@ -123,7 +124,26 @@ func getResult(checkTile *Tile, mapArr []string) (path []string) {
 			fmt.Println()
 		}
 	}
+	return
+}
 
+func reverse(arr []string) []string {
+	opposites := map[string]string{
+		"left":  "right",
+		"right": "left",
+		"up":    "down",
+		"down":  "up",
+	}
+	for i := range arr {
+		arr[i] = opposites[arr[i]]
+	}
+	return arr
+}
+
+func boxHandling(rules []string) (res []string) {
+	// index := sort.Search(len(rules), func(i int) bool { return strings.Contains(rules[i], "box") })
+	index := sort.SearchStrings(rules, "k")
+	fmt.Println(index)
 	return
 }
 
@@ -192,6 +212,8 @@ func AStar() {
 	}
 
 	fmt.Println(path)
+	boxHandling(path)
+
 }
 
 func main() {
