@@ -5,7 +5,7 @@ import (
 	"io/ioutil"
 	"log"
 	"math"
-	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/bradfitz/slice"
@@ -20,8 +20,8 @@ type Tile struct {
 	Parent       *Tile
 }
 
-var maxX = 12
-var maxY = 10
+var targetX = 12
+var targetY = 10
 
 func (t *Tile) setCostDistance() {
 	t.CostDistance = t.cost + t.distance
@@ -45,7 +45,7 @@ func getPossibleTiles(gameMap []string, currentTile, targetTile *Tile) []*Tile {
 	// initialize possible directions
 	for _, tile := range tilesDir {
 		tile.setDistance(targetTile.X, targetTile.Y)
-		if (tile.X >= 0 && tile.X <= maxX) && (tile.Y >= 0 && tile.Y <= maxY) {
+		if (tile.X >= 0 && tile.X <= targetX) && (tile.Y >= 0 && tile.Y <= targetY) {
 			if gameMap[tile.Y][tile.X] == '.' || gameMap[tile.Y][tile.X] == ';' {
 				// meeting breakable box (spends 11-12 ticks, depending on position)
 				if gameMap[tile.Y][tile.X] == ';' {
@@ -127,7 +127,7 @@ func getResult(checkTile *Tile, mapArr []string) (path []string) {
 	return
 }
 
-func reverse(arr []string) []string {
+func reverse(arr []string) (res []string) {
 	opposites := map[string]string{
 		"left":  "right",
 		"right": "left",
@@ -135,21 +135,88 @@ func reverse(arr []string) []string {
 		"down":  "up",
 	}
 	for i := range arr {
-		arr[i] = opposites[arr[i]]
+		res = append(res, opposites[arr[i]])
 	}
-	return arr
+	return res
 }
 
-func boxHandling(rules []string) (res []string) {
-	// index := sort.Search(len(rules), func(i int) bool { return strings.Contains(rules[i], "box") })
-	index := sort.SearchStrings(rules, "k")
-	fmt.Println(index)
+func concat(a, b []string) []string {
+	return append(a, b...)
+}
+
+func boxPath(path []string, k string) (res []string) {
+	res = append(res, "bomb")
+	res = append(res, reverse(path)...)
+	res = append(res, []string{"stay", "stay"}...)
+	res = append(res, path...)
+	res = append(res, k[:len(k)-4])
 	return
+}
+
+func boxHandling(path []string) (res []string) {
+	for i, k := range path {
+		if k[len(k)-1] == 'x' {
+			res = append(res, boxPath(path[i-3:i], k)...)
+		} else {
+			res = append(res, k)
+		}
+	}
+	return
+}
+
+func cellToBoxPriority(mapArr []string, x, y int) (res []string) {
+	maxX := len(mapArr[0])
+	maxY := len(mapArr)
+	for i := y; i < maxY; i++ {
+		for j := x; j < maxX; j++ {
+
+			if mapArr[i][j] != '.' {
+				continue
+			}
+			boxCount := 0
+
+			// Check right
+			if j+1 < maxX && mapArr[i][j+1] == ';' {
+				boxCount++
+			} else if j+2 < maxX && mapArr[i][j+1] != '!' && mapArr[i][j+2] == ';' {
+				boxCount++
+			}
+
+			// Check left
+			if j-1 >= 0 && mapArr[i][j-1] == ';' {
+				boxCount++
+			} else if j-2 >= 0 && mapArr[i][j-1] != '!' && mapArr[i][j-2] == ';' {
+				boxCount++
+			}
+
+			// Check down
+			if i+1 < maxY && mapArr[i+1][j] == ';' {
+				boxCount++
+			} else if i+2 < maxY && mapArr[i+1][j] != '!' && mapArr[i+2][j] == ';' {
+				boxCount++
+			}
+
+			// Check up
+			if i-1 >= 0 && mapArr[i-1][j] == ';' {
+				boxCount++
+			} else if i-2 >= 0 && mapArr[i-1][j] != '!' && mapArr[i-2][j] == ';' {
+				boxCount++
+			}
+
+			// Assign value to map
+			mapArr[i] = strings.Replace(mapArr[i], ".", strconv.Itoa(boxCount), 1)
+		}
+		// fmt.Println()
+	}
+	return mapArr
 }
 
 func AStar() {
 	mapArr := makeMapArray()
-
+	// fmt.Println("Map: \n", )
+	// for _, k := range cellToBoxPriority(mapArr, 0, 0) {
+	// 	fmt.Println(strings.Join(strings.Split(k, ""), " "))
+	// }
 	start := &Tile{
 		X: 0,
 		Y: 0,
@@ -199,7 +266,7 @@ func AStar() {
 			for _, k := range activeTiles {
 				if k.X == walkableTile.X && k.Y == walkableTile.Y {
 					existingTile := k
-					if existingTile.CostDistance > checkTile.CostDistance {
+					if existingTile.CostDistance > walkableTile.CostDistance {
 						// if so, just replace it
 						activeTiles = append(activeTiles, walkableTile)
 						activeTiles = remove(activeTiles, existingTile)
@@ -212,7 +279,8 @@ func AStar() {
 	}
 
 	fmt.Println(path)
-	boxHandling(path)
+	fmt.Println(boxHandling(path))
+	fmt.Println(path)
 
 }
 
