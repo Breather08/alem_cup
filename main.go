@@ -214,9 +214,9 @@ func cellToBoxPriority(mapArr []string, x, y int) (res []string) {
 func AStar() {
 	mapArr := makeMapArray()
 	// fmt.Println("Map: \n", )
-	// for _, k := range cellToBoxPriority(mapArr, 0, 0) {
-	// 	fmt.Println(strings.Join(strings.Split(k, ""), " "))
-	// }
+	for _, k := range cellToBoxPriority(mapArr, 0, 0) {
+		fmt.Println(strings.Join(strings.Split(k, ""), " "))
+	}
 	start := &Tile{
 		X: 0,
 		Y: 0,
