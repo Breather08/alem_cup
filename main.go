@@ -31,6 +31,34 @@ func (t *Tile) setDistance(targetX, targetY int) {
 	t.distance = int(math.Abs(float64(targetX-t.X)) + math.Abs(float64(targetY-t.Y)))
 }
 
+func remove(s []*Tile, target *Tile) (res []*Tile) {
+	for _, k := range s {
+		if k != target {
+			res = append(res, k)
+		}
+	}
+	return
+}
+
+func sortTiles(activeTiles []*Tile) {
+	slice.Sort(activeTiles, func(i, j int) bool {
+		return activeTiles[i].CostDistance > activeTiles[j].CostDistance
+	})
+}
+
+func makeMapArray() []string {
+	fileMap, err := ioutil.ReadFile("map1.txt")
+	if err != nil {
+		log.Println(err)
+	}
+	mapStr := ""
+	for _, k := range fileMap {
+		mapStr += string(k)
+	}
+
+	return strings.Split(mapStr, "\n")
+}
+
 func getPossibleTiles(gameMap []string, currentTile, targetTile *Tile) []*Tile {
 	// initialize 4 direction
 	tilesDir := []*Tile{
@@ -60,48 +88,22 @@ func getPossibleTiles(gameMap []string, currentTile, targetTile *Tile) []*Tile {
 	return possible
 }
 
-func remove(s []*Tile, target *Tile) (res []*Tile) {
-	for _, k := range s {
-		if k != target {
-			res = append(res, k)
-		}
-	}
-	return
-}
-
-func sortTiles(activeTiles []*Tile) {
-	slice.Sort(activeTiles, func(i, j int) bool {
-		return activeTiles[i].CostDistance < activeTiles[j].CostDistance
-	})
-}
-
-func makeMapArray() []string {
-	fileMap, err := ioutil.ReadFile("map1.txt")
-	if err != nil {
-		log.Println(err)
-	}
-	mapStr := ""
-	for _, k := range fileMap {
-		mapStr += string(k)
-	}
-
-	return strings.Split(mapStr, "\n")
-}
-
 func getResult(checkTile *Tile, mapArr []string) (path []string) {
 	var tile = checkTile
-	fmt.Println("Retracing steps backwards...")
+	// fmt.Println("Retracing steps backwards...")
 	for tile != nil {
 		box := ""
 		if mapArr[tile.Y][tile.X] == ';' {
 			box = ":box"
 		}
-		if mapArr[tile.Y][tile.X] == '.' || mapArr[tile.Y][tile.X] == ';' {
+		if mapArr[tile.Y][tile.X] != '!' {
 			var newMapRow = []rune(mapArr[tile.Y])
 			newMapRow[tile.X] = '*'
 			mapArr[tile.Y] = string(newMapRow)
 		}
-		fmt.Println(tile.X, ":", tile.Y)
+
+		possible := getPossibleTiles(mapArr, tile, )
+		// fmt.Println(tile.X, ":", tile.Y)
 		if tile.Parent != nil {
 			if tile.X > tile.Parent.X {
 				path = append([]string{"right" + box}, path...)
@@ -144,9 +146,10 @@ func concat(a, b []string) []string {
 	return append(a, b...)
 }
 
-func boxPath(path []string, k string) (res []string) {
+func boxPath(path []string, retreat []string, k string) (res []string) {
+	retreat = reverse(path)
 	res = append(res, "bomb")
-	res = append(res, reverse(path)...)
+	res = append(res, retreat...)
 	res = append(res, []string{"stay", "stay"}...)
 	res = append(res, path...)
 	res = append(res, k[:len(k)-4])
@@ -156,7 +159,7 @@ func boxPath(path []string, k string) (res []string) {
 func boxHandling(path []string) (res []string) {
 	for i, k := range path {
 		if k[len(k)-1] == 'x' {
-			res = append(res, boxPath(path[i-3:i], k)...)
+			res = append(res, boxPath(path[i-3:i], []string{}, k)...)
 		} else {
 			res = append(res, k)
 		}
@@ -202,7 +205,7 @@ func cellToBoxPriority(mapArr []string, x, y int) (res []string) {
 			} else if i-2 >= 0 && mapArr[i-1][j] != '!' && mapArr[i-2][j] == ';' {
 				boxCount++
 			}
-			
+
 			// Assign value to map
 			mapArr[i] = strings.Replace(mapArr[i], ".", strconv.Itoa(boxCount), 1)
 		}
@@ -211,21 +214,21 @@ func cellToBoxPriority(mapArr []string, x, y int) (res []string) {
 	return mapArr
 }
 
-func AStar() {
+func AStar(startX, startY, finishX, finishY int) {
 	mapArr := makeMapArray()
 	// fmt.Println("Map: \n", )
-	for _, k := range cellToBoxPriority(mapArr, 0, 0) {
-		fmt.Println(strings.Join(strings.Split(k, ""), " "))
-	}
+	// for _, k := range cellToBoxPriority(mapArr, 0, 0) {
+	// 	fmt.Println(strings.Join(strings.Split(k, ""), " "))
+	// }
 
 	start := &Tile{
-		X: 0,
-		Y: 0,
+		X: startX,
+		Y: startY,
 	}
 
 	finish := &Tile{
-		X: 12,
-		Y: 10,
+		X: finishX,
+		Y: finishY,
 	}
 
 	start.setDistance(finish.X, finish.Y)
@@ -279,11 +282,11 @@ func AStar() {
 		}
 	}
 
-	fmt.Println(path)
-	fmt.Println(boxHandling(path))
+	// fmt.Println(path)
+	// fmt.Println(boxHandling(path))
 	fmt.Println(path)
 }
 
 func main() {
-	AStar()
+	AStar(0, 0, 12, 10)
 }
