@@ -46,7 +46,7 @@ func getPossibleTiles(gameMap []string, currentTile, targetTile *Tile) []*Tile {
 	for _, tile := range tilesDir {
 		tile.setDistance(targetTile.X, targetTile.Y)
 		if (tile.X >= 0 && tile.X <= targetX) && (tile.Y >= 0 && tile.Y <= targetY) {
-			if gameMap[tile.Y][tile.X] == '.' || gameMap[tile.Y][tile.X] == ';' {
+			if gameMap[tile.Y][tile.X] != '!' {
 				// meeting breakable box (spends 11-12 ticks, depending on position)
 				if gameMap[tile.Y][tile.X] == ';' {
 					tile.cost += 10
@@ -202,7 +202,7 @@ func cellToBoxPriority(mapArr []string, x, y int) (res []string) {
 			} else if i-2 >= 0 && mapArr[i-1][j] != '!' && mapArr[i-2][j] == ';' {
 				boxCount++
 			}
-
+			
 			// Assign value to map
 			mapArr[i] = strings.Replace(mapArr[i], ".", strconv.Itoa(boxCount), 1)
 		}
@@ -217,6 +217,7 @@ func AStar() {
 	for _, k := range cellToBoxPriority(mapArr, 0, 0) {
 		fmt.Println(strings.Join(strings.Split(k, ""), " "))
 	}
+
 	start := &Tile{
 		X: 0,
 		Y: 0,
@@ -281,7 +282,6 @@ func AStar() {
 	fmt.Println(path)
 	fmt.Println(boxHandling(path))
 	fmt.Println(path)
-
 }
 
 func main() {
