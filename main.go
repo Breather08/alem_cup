@@ -21,9 +21,6 @@ type Tile struct {
 	Parent       *Tile
 }
 
-var targetX = 12
-var targetY = 10
-
 func (t *Tile) setCostDistance() {
 	t.CostDistance = t.cost + t.distance
 }
@@ -60,71 +57,6 @@ func makeMapArray() []string {
 	return strings.Split(mapStr, "\n")
 }
 
-func getPossibleTiles(gameMap []string, currentTile, targetTile *Tile) []*Tile {
-	// initialize 4 direction
-	tilesDir := []*Tile{
-		&Tile{X: currentTile.X, Y: currentTile.Y - 1, cost: currentTile.cost + 1, Parent: currentTile, direction: "up"},
-		&Tile{X: currentTile.X, Y: currentTile.Y + 1, cost: currentTile.cost + 1, Parent: currentTile, direction: "down"},
-		&Tile{X: currentTile.X - 1, Y: currentTile.Y, cost: currentTile.cost + 1, Parent: currentTile, direction: "left"},
-		&Tile{X: currentTile.X + 1, Y: currentTile.Y, cost: currentTile.cost + 1, Parent: currentTile, direction: "right"},
-	}
-
-	possible := []*Tile{}
-
-	// initialize possible directions
-	for _, tile := range tilesDir {
-		tile.setDistance(targetTile.X, targetTile.Y)
-		if (tile.X >= 0 && tile.X <= targetX) && (tile.Y >= 0 && tile.Y <= targetY) {
-			if gameMap[tile.Y][tile.X] != '!' {
-				// meeting breakable box (spends 11-12 ticks, depending on position)
-				if gameMap[tile.Y][tile.X] == ';' {
-					tile.cost += 10
-				}
-				tile.setCostDistance()
-				possible = append(possible, tile)
-			}
-		}
-	}
-
-	return possible
-}
-
-func getResult(checkTile *Tile, mapArr []string) (path []string) {
-	var tile = checkTile
-	for tile != nil {
-		if mapArr[tile.Y][tile.X] == ';' {
-			var isVertical = false
-			if tile.Parent.direction == "up" || tile.Parent.direction == "down" {
-				isVertical = true
-			}
-			path = append([]string{"bomb"}, path...)
-			possible := getPossibleTiles(mapArr, tile.Parent.Parent, tile)
-			fmt.Println(isVertical)
-			for _, k := range possible {
-				fmt.Println(k.X, k.Y)
-			}
-			fmt.Println()
-		} else {
-			path = append([]string{tile.direction}, path...)
-		}
-		if mapArr[tile.Y][tile.X] != '!' {
-			var newMapRow = []rune(mapArr[tile.Y])
-			newMapRow[tile.X] = '*'
-			mapArr[tile.Y] = string(newMapRow)
-		}
-
-		tile = tile.Parent
-		if tile == nil {
-			fmt.Println("\nMap:")
-			for _, k := range mapArr {
-				fmt.Println(k)
-			}
-			fmt.Println()
-		}
-	}
-	return
-}
-
 func reverse(arr []string) (res []string) {
 	opposites := map[string]string{
 		"left":  "right",
@@ -156,6 +88,92 @@ func boxHandling(path []string) (res []string) {
 			res = append(res, k)
 		}
 	}
+	return
+}
+
+func getPossibleTiles(gameMap []string, currentTile, targetTile *Tile) []*Tile {
+	// initialize 4 direction
+	tilesDir := []*Tile{
+		&Tile{X: currentTile.X, Y: currentTile.Y - 1, cost: currentTile.cost + 1, Parent: currentTile, direction: "up"},
+		&Tile{X: currentTile.X, Y: currentTile.Y + 1, cost: currentTile.cost + 1, Parent: currentTile, direction: "down"},
+		&Tile{X: currentTile.X - 1, Y: currentTile.Y, cost: currentTile.cost + 1, Parent: currentTile, direction: "left"},
+		&Tile{X: currentTile.X + 1, Y: currentTile.Y, cost: currentTile.cost + 1, Parent: currentTile, direction: "right"},
+	}
+
+	possible := []*Tile{}
+
+	// initialize possible directions
+	for _, tile := range tilesDir {
+		tile.setDistance(targetTile.X, targetTile.Y)
+
+		if (tile.X >= 0 && tile.X <= targetTile.X) && (tile.Y >= 0 && tile.Y <= targetTile.X) {
+			fmt.Println(tile.X, tile.Y)
+			if gameMap[tile.Y][tile.X] != '!' {
+				// meeting breakable box (spends 11-12 ticks, depending on position)
+				if gameMap[tile.Y][tile.X] == ';' {
+					tile.cost += 10
+				}
+		
+				tile.setCostDistance()
+				possible = append(possible, tile)
+			}
+
+		}
+	}
+
+	return possible
+}
+
+func getResult(checkTile *Tile, mapArr []string) (path []string) {
+	var tile = checkTile
+	for tile != nil {
+
+		
+		if mapArr[tile.Y][tile.X] == ';' {
+			path = append([]string{"bomb"}, path...)
+
+			retreat := &Tile{
+				X: tile.Parent.X,
+				Y: tile.Parent.Y,
+			}
+
+			possible := getPossibleTiles(mapArr, retreat, tile)
+
+			for _, k := range possible {
+				if k.direction != tile.direction || mapArr[k.X][k.Y] != ';' {
+					fmt.Println(k.direction)
+				}
+			}
+
+			var isVertical = false
+			
+			if tile.Parent.direction == "up" || tile.Parent.direction == "down" {
+				isVertical = true
+			}
+			
+			fmt.Println(isVertical)
+		} else {
+			path = append([]string{tile.direction}, path...)
+		}
+
+		if mapArr[tile.Y][tile.X] != '!' {
+			var newMapRow = []rune(mapArr[tile.Y])
+			newMapRow[tile.X] = '*'
+			mapArr[tile.Y] = string(newMapRow)
+		}
+
+		tile = tile.Parent
+
+		if tile == nil {
+			fmt.Println("\nMap:")
+			for _, k := range mapArr {
+				fmt.Println(k)
+			}
+			fmt.Println()
+		}
+
+	}
+
 	return
 }
 
@@ -216,12 +234,13 @@ func cellToBoxPriority(mapArr []string, x, y int) (res []string, priorTile *Tile
 	return mapArr, priorTile
 }
 
+// Path finding Algorithm
 func AStar(startX, startY, finishX, finishY int) {
 	mapArr := makeMapArray()
 	// fmt.Println("Map: \n", )
 	// mapArr, priorTile := cellToBoxPriority(mapArr, 0, 0)
 	// for _, k := range mapArr {
-	// 	fmt.Println(strings.Join(strings.Split(k, ""), " "))
+	// 	fmt.Println(strings.Join(strings.Split(k, ""), " "), priorTile)
 	// }
 
 	start := &Tile{
@@ -288,9 +307,9 @@ func AStar(startX, startY, finishX, finishY int) {
 
 	// fmt.Println(path)
 	// fmt.Println(boxHandling(path))
-	fmt.Println(path[1:])
+	fmt.Println(path)
 }
 
 func main() {
-	AStar(0, 0, 12, 10)
+	AStar(0, 0, 2, 1)
 }
