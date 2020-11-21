@@ -17,11 +17,11 @@ type Tile struct {
 	distance     int
 	cost         int
 	CostDistance int
+	direction    string
+	isBox        bool
+	retreatPath  []string
 	Parent       *Tile
 }
-
-var targetX = 12
-var targetY = 10
 
 func (t *Tile) setCostDistance() {
 	t.CostDistance = t.cost + t.distance
@@ -31,7 +31,7 @@ func (t *Tile) setDistance(targetX, targetY int) {
 	t.distance = int(math.Abs(float64(targetX-t.X)) + math.Abs(float64(targetY-t.Y)))
 }
 
-func remove(s []*Tile, target *Tile) (res []*Tile) {
+func removeTile(s []*Tile, target *Tile) (res []*Tile) {
 	for _, k := range s {
 		if k != target {
 			res = append(res, k)
@@ -62,10 +62,10 @@ func makeMapArray() []string {
 func getPossibleTiles(gameMap []string, currentTile, targetTile *Tile) []*Tile {
 	// initialize 4 direction
 	tilesDir := []*Tile{
-		&Tile{X: currentTile.X, Y: currentTile.Y - 1, cost: currentTile.cost + 1, Parent: currentTile},
-		&Tile{X: currentTile.X, Y: currentTile.Y + 1, cost: currentTile.cost + 1, Parent: currentTile},
-		&Tile{X: currentTile.X - 1, Y: currentTile.Y, cost: currentTile.cost + 1, Parent: currentTile},
-		&Tile{X: currentTile.X + 1, Y: currentTile.Y, cost: currentTile.cost + 1, Parent: currentTile},
+		&Tile{X: currentTile.X, Y: currentTile.Y - 1, cost: currentTile.cost + 1, Parent: currentTile, direction: "up"},
+		&Tile{X: currentTile.X, Y: currentTile.Y + 1, cost: currentTile.cost + 1, Parent: currentTile, direction: "down"},
+		&Tile{X: currentTile.X - 1, Y: currentTile.Y, cost: currentTile.cost + 1, Parent: currentTile, direction: "left"},
+		&Tile{X: currentTile.X + 1, Y: currentTile.Y, cost: currentTile.cost + 1, Parent: currentTile, direction: "right"},
 	}
 
 	possible := []*Tile{}
@@ -73,10 +73,11 @@ func getPossibleTiles(gameMap []string, currentTile, targetTile *Tile) []*Tile {
 	// initialize possible directions
 	for _, tile := range tilesDir {
 		tile.setDistance(targetTile.X, targetTile.Y)
-		if (tile.X >= 0 && tile.X <= targetX) && (tile.Y >= 0 && tile.Y <= targetY) {
+		if (tile.X >= 0 && tile.X <= targetTile.X) && (tile.Y >= 0 && tile.Y <= targetTile.Y) {
 			if gameMap[tile.Y][tile.X] != '!' {
 				// meeting breakable box (spends 11-12 ticks, depending on position)
 				if gameMap[tile.Y][tile.X] == ';' {
+					tile.isBox = true
 					tile.cost += 10
 				}
 				tile.setCostDistance()
@@ -90,34 +91,20 @@ func getPossibleTiles(gameMap []string, currentTile, targetTile *Tile) []*Tile {
 
 func getResult(checkTile *Tile, mapArr []string) (path []string) {
 	var tile = checkTile
-	// fmt.Println("Retracing steps backwards...")
 	for tile != nil {
-		box := ""
-		if mapArr[tile.Y][tile.X] == ';' {
-			box = ":box"
+
+		if tile.direction != "" {
+			path = append([]string{tile.direction}, path...)
 		}
+
 		if mapArr[tile.Y][tile.X] != '!' {
 			var newMapRow = []rune(mapArr[tile.Y])
-			newMapRow[tile.X] = '*'
+			// newMapRow[tile.X] = '*'
 			mapArr[tile.Y] = string(newMapRow)
 		}
 
-		possible := getPossibleTiles(mapArr, tile, )
-		// fmt.Println(tile.X, ":", tile.Y)
-		if tile.Parent != nil {
-			if tile.X > tile.Parent.X {
-				path = append([]string{"right" + box}, path...)
-			} else if tile.X < tile.Parent.X {
-				path = append([]string{"left" + box}, path...)
-			} else {
-				if tile.Y == tile.Parent.Y {
-					path = append([]string{"up" + box}, path...)
-				} else {
-					path = append([]string{"down" + box}, path...)
-				}
-			}
-		}
 		tile = tile.Parent
+
 		if tile == nil {
 			fmt.Println("\nMap:")
 			for _, k := range mapArr {
@@ -125,7 +112,9 @@ func getResult(checkTile *Tile, mapArr []string) (path []string) {
 			}
 			fmt.Println()
 		}
+
 	}
+
 	return
 }
 
@@ -137,13 +126,11 @@ func reverse(arr []string) (res []string) {
 		"down":  "up",
 	}
 	for i := range arr {
-		res = append(res, opposites[arr[i]])
+		if opposites[arr[i]] != "" {
+			res = append([]string{opposites[arr[i]]}, res...)
+		}
 	}
 	return res
-}
-
-func concat(a, b []string) []string {
-	return append(a, b...)
 }
 
 func boxPath(path []string, retreat []string, k string) (res []string) {
@@ -214,7 +201,16 @@ func cellToBoxPriority(mapArr []string, x, y int) (res []string) {
 	return mapArr
 }
 
-func AStar(startX, startY, finishX, finishY int) {
+func (t *Tile) setRetreatPath(finish *Tile) {
+	retreat := append([]string{"bomb"}, AStar(t.Parent.X, t.Parent.Y, finish.X, finish.Y)...)
+	retreat = append(retreat, []string{"stay", "stay"}...)
+	retreat = append(retreat, reverse(retreat)...)
+	retreat = append(retreat, t.direction)
+	t.retreatPath = retreat
+	t.isBox = false
+}
+
+func AStar(startX, startY, finishX, finishY int) (path []string) {
 	mapArr := makeMapArray()
 	// fmt.Println("Map: \n", )
 	// for _, k := range cellToBoxPriority(mapArr, 0, 0) {
@@ -231,12 +227,12 @@ func AStar(startX, startY, finishX, finishY int) {
 		Y: finishY,
 	}
 
+	checkTile := &Tile{}
+
 	start.setDistance(finish.X, finish.Y)
 
 	activeTiles := []*Tile{start}
 	visitedTiles := []*Tile{}
-
-	path := []string{}
 
 	for len(activeTiles) > 0 {
 
@@ -244,15 +240,27 @@ func AStar(startX, startY, finishX, finishY int) {
 		sortTiles(activeTiles)
 
 		// Best option
-		var checkTile = activeTiles[0]
+		checkTile = activeTiles[0]
+
+		if checkTile.isBox {
+			retreatTile := &Tile{
+				X: 1,
+				Y: 0,
+			}
+			checkTile.setRetreatPath(retreatTile)
+			fmt.Println(checkTile.retreatPath)
+		} else {
+			path = append(path, checkTile.direction)
+		}
 
 		// Bim! Printing
 		if checkTile.X == finish.X && checkTile.Y == finish.Y {
-			path = getResult(checkTile, mapArr)
+			// path = getResult(checkTile, mapArr)
+			return
 		}
 
 		visitedTiles = append(visitedTiles, checkTile)
-		activeTiles = remove(activeTiles, checkTile)
+		activeTiles = removeTile(activeTiles, checkTile)
 
 		possible := getPossibleTiles(mapArr, checkTile, finish)
 
@@ -273,7 +281,7 @@ func AStar(startX, startY, finishX, finishY int) {
 					if existingTile.CostDistance > walkableTile.CostDistance {
 						// if so, just replace it
 						activeTiles = append(activeTiles, walkableTile)
-						activeTiles = remove(activeTiles, existingTile)
+						activeTiles = removeTile(activeTiles, existingTile)
 						continue Loop
 					}
 				}
@@ -282,11 +290,50 @@ func AStar(startX, startY, finishX, finishY int) {
 		}
 	}
 
-	// fmt.Println(path)
-	// fmt.Println(boxHandling(path))
-	fmt.Println(path)
+	// return getResult(checkTile, mapArr)
+	return
 }
 
 func main() {
-	AStar(0, 0, 12, 10)
+	path := AStar(0, 0, 12, 10)
+	fmt.Println(path)
 }
+
+// current := &Tile{
+// 	X: 0,
+// 	Y: 1,
+// }
+
+// visited := []*Tile{}
+// active := []*Tile{current}
+
+// path = append([]string{"bomb"}, path...)
+// counter := 0
+// for !isSafe {
+// 	counter++
+// 	current = active[0]
+// 	// fmt.Println(current)
+// 	if counter == 4 {
+// 		isSafe = true
+// 	}
+
+// 	visited = append(visited, current)
+// 	active = removeTile(active, current)
+
+// 	possible := getPossibleTiles(mapArr, current, tile)
+
+// Loop:
+// 	for _, walkable := range possible {
+
+// 		for _, k := range visited {
+// 			if k.X == walkable.X && k.Y == walkable.Y || walkable.isBox {
+// 				continue Loop
+// 			}
+// 		}
+
+// 		active = append(active, walkable)
+// 		fmt.Println(active[0], mapArr[0][2])
+// 	}
+
+// 	// fmt.Println(active)
+// }
