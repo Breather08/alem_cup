@@ -42,7 +42,7 @@ func removeTile(s []*Tile, target *Tile) (res []*Tile) {
 
 func sortTiles(activeTiles []*Tile) {
 	slice.Sort(activeTiles, func(i, j int) bool {
-		return activeTiles[i].CostDistance > activeTiles[j].CostDistance
+		return activeTiles[i].CostDistance < activeTiles[j].CostDistance
 	})
 }
 
@@ -93,13 +93,18 @@ func getResult(checkTile *Tile, mapArr []string) (path []string) {
 	var tile = checkTile
 	for tile != nil {
 
+		fmt.Println(tile)
+		if len(tile.retreatPath) > 0 {
+			path = append(tile.retreatPath, path...)
+		}
+
 		if tile.direction != "" {
 			path = append([]string{tile.direction}, path...)
 		}
 
 		if mapArr[tile.Y][tile.X] != '!' {
 			var newMapRow = []rune(mapArr[tile.Y])
-			// newMapRow[tile.X] = '*'
+			newMapRow[tile.X] = '*'
 			mapArr[tile.Y] = string(newMapRow)
 		}
 
@@ -201,8 +206,9 @@ func cellToBoxPriority(mapArr []string, x, y int) (res []string) {
 	return mapArr
 }
 
-func (t *Tile) setRetreatPath(finish *Tile) {
-	retreat := append([]string{"bomb"}, AStar(t.Parent.X, t.Parent.Y, finish.X, finish.Y)...)
+func (t *Tile) setRetreatPath(mapArr []string) {
+	retreatPath := AStar(mapArr, t.Parent.X, t.Parent.Y, true)
+	retreat := append([]string{"bomb"}, retreatPath...)
 	retreat = append(retreat, []string{"stay", "stay"}...)
 	retreat = append(retreat, reverse(retreat)...)
 	retreat = append(retreat, t.direction)
@@ -210,12 +216,17 @@ func (t *Tile) setRetreatPath(finish *Tile) {
 	t.isBox = false
 }
 
-func AStar(startX, startY, finishX, finishY int) (path []string) {
-	mapArr := makeMapArray()
+func AStar(mapArr []string, startX, startY int, isBox bool) (path []string) {
 	// fmt.Println("Map: \n", )
 	// for _, k := range cellToBoxPriority(mapArr, 0, 0) {
 	// 	fmt.Println(strings.Join(strings.Split(k, ""), " "))
 	// }
+
+	blockedMap := []string{}
+
+	for _, k := range mapArr {
+		blockedMap = append(blockedMap, strings.ReplaceAll(k, ";", "!"))
+	}
 
 	start := &Tile{
 		X: startX,
@@ -223,8 +234,8 @@ func AStar(startX, startY, finishX, finishY int) (path []string) {
 	}
 
 	finish := &Tile{
-		X: finishX,
-		Y: finishY,
+		X: 12,
+		Y: 10,
 	}
 
 	checkTile := &Tile{}
@@ -233,8 +244,9 @@ func AStar(startX, startY, finishX, finishY int) (path []string) {
 
 	activeTiles := []*Tile{start}
 	visitedTiles := []*Tile{}
-
+	counter := 0
 	for len(activeTiles) > 0 {
+		counter++
 
 		// Sorting tiles in stack to chose better option
 		sortTiles(activeTiles)
@@ -243,19 +255,12 @@ func AStar(startX, startY, finishX, finishY int) (path []string) {
 		checkTile = activeTiles[0]
 
 		if checkTile.isBox {
-			retreatTile := &Tile{
-				X: 1,
-				Y: 0,
-			}
-			checkTile.setRetreatPath(retreatTile)
-			fmt.Println(checkTile.retreatPath)
-		} else {
-			path = append(path, checkTile.direction)
+			checkTile.setRetreatPath(blockedMap)
 		}
 
 		// Bim! Printing
 		if checkTile.X == finish.X && checkTile.Y == finish.Y {
-			// path = getResult(checkTile, mapArr)
+			path = getResult(checkTile, mapArr)
 			return
 		}
 
@@ -295,45 +300,7 @@ func AStar(startX, startY, finishX, finishY int) (path []string) {
 }
 
 func main() {
-	path := AStar(0, 0, 12, 10)
+	mapArr := makeMapArray()
+	path := AStar(mapArr, 0, 0, false)
 	fmt.Println(path)
 }
-
-// current := &Tile{
-// 	X: 0,
-// 	Y: 1,
-// }
-
-// visited := []*Tile{}
-// active := []*Tile{current}
-
-// path = append([]string{"bomb"}, path...)
-// counter := 0
-// for !isSafe {
-// 	counter++
-// 	current = active[0]
-// 	// fmt.Println(current)
-// 	if counter == 4 {
-// 		isSafe = true
-// 	}
-
-// 	visited = append(visited, current)
-// 	active = removeTile(active, current)
-
-// 	possible := getPossibleTiles(mapArr, current, tile)
-
-// Loop:
-// 	for _, walkable := range possible {
-
-// 		for _, k := range visited {
-// 			if k.X == walkable.X && k.Y == walkable.Y || walkable.isBox {
-// 				continue Loop
-// 			}
-// 		}
-
-// 		active = append(active, walkable)
-// 		fmt.Println(active[0], mapArr[0][2])
-// 	}
-
-// 	// fmt.Println(active)
-// }
