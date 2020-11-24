@@ -5,96 +5,57 @@ import (
 	"io/ioutil"
 	"log"
 	"math"
-	"strconv"
+	"sort"
 	"strings"
-
-	"github.com/bradfitz/slice"
 )
 
+type Coords struct {
+	x int
+	y int
+}
+
+type Entity struct {
+	name string
+	id   int
+	Coords
+	param1 int
+	param2 int
+}
+
 type Tile struct {
-	X            int
-	Y            int
+	Coords
+	direction    string
 	distance     int
 	cost         int
 	CostDistance int
-	direction    string
-	isBox        bool
 	retreatPath  []string
+	isBox        bool
 	Parent       *Tile
 }
+
+const (
+	maxX       = 12
+	maxY       = 10
+	bombRadius = 2
+)
 
 func (t *Tile) setCostDistance() {
 	t.CostDistance = t.cost + t.distance
 }
 
 func (t *Tile) setDistance(targetX, targetY int) {
-	t.distance = int(math.Abs(float64(targetX-t.X)) + math.Abs(float64(targetY-t.Y)))
-}
-
-func removeTile(s []*Tile, target *Tile) (res []*Tile) {
-	for _, k := range s {
-		if k != target {
-			res = append(res, k)
-		}
-	}
-	return
-}
-
-func sortTiles(activeTiles []*Tile) {
-	slice.Sort(activeTiles, func(i, j int) bool {
-		return activeTiles[i].CostDistance < activeTiles[j].CostDistance
-	})
-}
-
-func makeMapArray() []string {
-	fileMap, err := ioutil.ReadFile("map1.txt")
-	if err != nil {
-		log.Println(err)
-	}
-	mapStr := ""
-	for _, k := range fileMap {
-		mapStr += string(k)
-	}
-
-	return strings.Split(mapStr, "\n")
-}
-
-func getPossibleTiles(gameMap []string, currentTile, targetTile *Tile) []*Tile {
-	// initialize 4 direction
-	tilesDir := []*Tile{
-		&Tile{X: currentTile.X, Y: currentTile.Y - 1, cost: currentTile.cost + 1, Parent: currentTile, direction: "up"},
-		&Tile{X: currentTile.X, Y: currentTile.Y + 1, cost: currentTile.cost + 1, Parent: currentTile, direction: "down"},
-		&Tile{X: currentTile.X - 1, Y: currentTile.Y, cost: currentTile.cost + 1, Parent: currentTile, direction: "left"},
-		&Tile{X: currentTile.X + 1, Y: currentTile.Y, cost: currentTile.cost + 1, Parent: currentTile, direction: "right"},
-	}
-
-	possible := []*Tile{}
-
-	// initialize possible directions
-	for _, tile := range tilesDir {
-		tile.setDistance(targetTile.X, targetTile.Y)
-		if (tile.X >= 0 && tile.X <= targetTile.X) && (tile.Y >= 0 && tile.Y <= targetTile.Y) {
-			if gameMap[tile.Y][tile.X] != '!' {
-				// meeting breakable box (spends 11-12 ticks, depending on position)
-				if gameMap[tile.Y][tile.X] == ';' {
-					tile.isBox = true
-					tile.cost += 10
-				}
-				tile.setCostDistance()
-				possible = append(possible, tile)
-			}
-		}
-	}
-
-	return possible
+	t.distance = int(math.Abs(float64(targetX-t.x)) + math.Abs(float64(targetY-t.y)))
 }
 
 func getResult(checkTile *Tile, mapArr []string) (path []string) {
 	var tile = checkTile
+	counter := 0
 	for tile != nil {
-
-		fmt.Println(tile)
+		counter++
 		if len(tile.retreatPath) > 0 {
+			if len(path) > 1 {
+				path = path[:len(path)-1]
+			}
 			path = append(tile.retreatPath, path...)
 		}
 
@@ -102,10 +63,10 @@ func getResult(checkTile *Tile, mapArr []string) (path []string) {
 			path = append([]string{tile.direction}, path...)
 		}
 
-		if mapArr[tile.Y][tile.X] != '!' {
-			var newMapRow = []rune(mapArr[tile.Y])
-			newMapRow[tile.X] = '*'
-			mapArr[tile.Y] = string(newMapRow)
+		if mapArr[tile.y][tile.x] != '!' {
+			var newMapRow = []rune(mapArr[tile.y])
+			newMapRow[tile.x] = '*'
+			mapArr[tile.y] = string(newMapRow)
 		}
 
 		tile = tile.Parent
@@ -123,6 +84,34 @@ func getResult(checkTile *Tile, mapArr []string) (path []string) {
 	return
 }
 
+func remove(s []*Tile, target *Tile) (res []*Tile) {
+	for _, k := range s {
+		if k != target {
+			res = append(res, k)
+		}
+	}
+	return
+}
+
+func sortTiles(activeTiles []*Tile) {
+	sort.Slice(activeTiles, func(i, j int) bool {
+		return activeTiles[i].CostDistance > activeTiles[j].CostDistance
+	})
+}
+
+func makeMapArray() []string {
+	fileMap, err := ioutil.ReadFile("map1.txt")
+	if err != nil {
+		log.Println(err)
+	}
+	mapStr := ""
+	for _, k := range fileMap {
+		mapStr += string(k)
+	}
+
+	return strings.Split(mapStr, "\n")
+}
+
 func reverse(arr []string) (res []string) {
 	opposites := map[string]string{
 		"left":  "right",
@@ -138,169 +127,266 @@ func reverse(arr []string) (res []string) {
 	return res
 }
 
-func boxPath(path []string, retreat []string, k string) (res []string) {
-	retreat = reverse(path)
-	res = append(res, "bomb")
-	res = append(res, retreat...)
-	res = append(res, []string{"stay", "stay"}...)
-	res = append(res, path...)
-	res = append(res, k[:len(k)-4])
-	return
-}
+func getPossibleTiles(gameMap []string, currentTile, targetTile *Tile, visitedTiles []*Tile) []*Tile {
+	// initialize 4 direction
+	tilesDir := []*Tile{
+		&Tile{Coords: Coords{x: currentTile.x, y: currentTile.y - 1}, cost: currentTile.cost + 1, Parent: currentTile, direction: "up"},
+		&Tile{Coords: Coords{x: currentTile.x, y: currentTile.y + 1}, cost: currentTile.cost + 1, Parent: currentTile, direction: "down"},
+		&Tile{Coords: Coords{x: currentTile.x - 1, y: currentTile.y}, cost: currentTile.cost + 1, Parent: currentTile, direction: "left"},
+		&Tile{Coords: Coords{x: currentTile.x + 1, y: currentTile.y}, cost: currentTile.cost + 1, Parent: currentTile, direction: "right"},
+	}
 
-func boxHandling(path []string) (res []string) {
-	for i, k := range path {
-		if k[len(k)-1] == 'x' {
-			res = append(res, boxPath(path[i-3:i], []string{}, k)...)
-		} else {
-			res = append(res, k)
+	possible := []*Tile{}
+
+	// initialize possible directions
+Loop:
+	for _, tile := range tilesDir {
+		tile.setDistance(targetTile.x, targetTile.y)
+		if (tile.x >= 0 && tile.x <= maxX) && (tile.y >= 0 && tile.y <= maxY) {
+			if gameMap[tile.y][tile.x] == '.' || gameMap[tile.y][tile.x] == ';' {
+
+				// Prevent entering visited cell
+				for _, k := range visitedTiles {
+					if k.x == tile.x && k.y == tile.y {
+						continue Loop
+					}
+				}
+
+				// meeting breakable box (spends 11-12 ticks, depending on position)
+				if gameMap[tile.y][tile.x] == ';' {
+					tile.isBox = true
+					tile.cost += 10
+				}
+
+				tile.setCostDistance()
+				possible = append(possible, tile)
+			}
 		}
 	}
-	return
-}
 
-func cellToBoxPriority(mapArr []string, x, y int) (res []string) {
-	maxX := len(mapArr[0])
-	maxY := len(mapArr)
-	for i := y; i < maxY; i++ {
-		for j := x; j < maxX; j++ {
-
-			if mapArr[i][j] != '.' {
-				continue
-			}
-			boxCount := 0
-
-			// Check right
-			if j+1 < maxX && mapArr[i][j+1] == ';' {
-				boxCount++
-			} else if j+2 < maxX && mapArr[i][j+1] != '!' && mapArr[i][j+2] == ';' {
-				boxCount++
-			}
-
-			// Check left
-			if j-1 >= 0 && mapArr[i][j-1] == ';' {
-				boxCount++
-			} else if j-2 >= 0 && mapArr[i][j-1] != '!' && mapArr[i][j-2] == ';' {
-				boxCount++
-			}
-
-			// Check down
-			if i+1 < maxY && mapArr[i+1][j] == ';' {
-				boxCount++
-			} else if i+2 < maxY && mapArr[i+1][j] != '!' && mapArr[i+2][j] == ';' {
-				boxCount++
-			}
-
-			// Check up
-			if i-1 >= 0 && mapArr[i-1][j] == ';' {
-				boxCount++
-			} else if i-2 >= 0 && mapArr[i-1][j] != '!' && mapArr[i-2][j] == ';' {
-				boxCount++
-			}
-
-			// Assign value to map
-			mapArr[i] = strings.Replace(mapArr[i], ".", strconv.Itoa(boxCount), 1)
-		}
-		// fmt.Println()
-	}
-	return mapArr
+	return possible
 }
 
 func (t *Tile) setRetreatPath(mapArr []string) {
-	retreatPath := AStar(mapArr, t.Parent.X, t.Parent.Y, true)
+
+	retreatCoord := bfs(mapArr, Coords{x: t.Parent.x, y: t.Parent.y})
+	fmt.Println(retreatCoord)
+	return
+	retreatPath := AStar(mapArr, retreatCoord)
 	retreat := append([]string{"bomb"}, retreatPath...)
 	retreat = append(retreat, []string{"stay", "stay"}...)
 	retreat = append(retreat, reverse(retreat)...)
 	retreat = append(retreat, t.direction)
 	t.retreatPath = retreat
-	t.isBox = false
+
 }
 
-func AStar(mapArr []string, startX, startY int, isBox bool) (path []string) {
-	// fmt.Println("Map: \n", )
-	// for _, k := range cellToBoxPriority(mapArr, 0, 0) {
-	// 	fmt.Println(strings.Join(strings.Split(k, ""), " "))
-	// }
+func replaceAtIndex(in string, r rune, i int) string {
+    out := []rune(in)
+    out[i] = r
+    return string(out)
+}
 
-	blockedMap := []string{}
+func updateMap(gameMap []string, bombCell Coords) {
+	gameMap[bombCell.y] = replaceAtIndex(gameMap[bombCell.y], '.', bombCell.x)
+}
 
-	for _, k := range mapArr {
-		blockedMap = append(blockedMap, strings.ReplaceAll(k, ";", "!"))
-	}
-
-	start := &Tile{
-		X: startX,
-		Y: startY,
-	}
-
-	finish := &Tile{
-		X: 12,
-		Y: 10,
-	}
+func AStar(mapArr []string, startCoords Coords) (path []string) {
 
 	checkTile := &Tile{}
 
-	start.setDistance(finish.X, finish.Y)
+	start := &Tile{
+		Coords: startCoords,
+	}
+
+	finish := &Tile{
+		Coords: Coords{
+			x: maxX,
+			y: maxY,
+		},
+	}
+
+	start.setDistance(finish.x, finish.y)
 
 	activeTiles := []*Tile{start}
 	visitedTiles := []*Tile{}
-	counter := 0
+
 	for len(activeTiles) > 0 {
-		counter++
 
 		// Sorting tiles in stack to chose better option
 		sortTiles(activeTiles)
 
 		// Best option
 		checkTile = activeTiles[0]
-
+		
+		// Set Bomb and update map
 		if checkTile.isBox {
-			checkTile.setRetreatPath(blockedMap)
+			checkTile.setRetreatPath(mapArr)
+			updateMap(mapArr, checkTile.Coords)
 		}
 
-		// Bim! Printing
-		if checkTile.X == finish.X && checkTile.Y == finish.Y {
+		if checkTile.x == finish.x && checkTile.y == finish.y {
 			path = getResult(checkTile, mapArr)
 			return
 		}
 
 		visitedTiles = append(visitedTiles, checkTile)
-		activeTiles = removeTile(activeTiles, checkTile)
+		activeTiles = remove(activeTiles, checkTile)
 
-		possible := getPossibleTiles(mapArr, checkTile, finish)
+		possible := getPossibleTiles(mapArr, checkTile, finish, visitedTiles)
 
-		// Creating label to be able to skip unnecessary counting
-	Loop:
 		for _, walkableTile := range possible {
-			// Prevent entering visited cell
-			for _, k := range visitedTiles {
-				if k.X == walkableTile.X && k.Y == walkableTile.Y {
-					continue Loop
-				}
-			}
-
-			// Check if new tile has better value
-			for _, k := range activeTiles {
-				if k.X == walkableTile.X && k.Y == walkableTile.Y {
-					existingTile := k
-					if existingTile.CostDistance > walkableTile.CostDistance {
-						// if so, just replace it
-						activeTiles = append(activeTiles, walkableTile)
-						activeTiles = removeTile(activeTiles, existingTile)
-						continue Loop
-					}
-				}
-			}
 			activeTiles = append(activeTiles, walkableTile)
 		}
 	}
 
-	// return getResult(checkTile, mapArr)
+	path = getResult(checkTile, mapArr)
+
+	fmt.Println(path)
 	return
 }
 
 func main() {
 	mapArr := makeMapArray()
-	path := AStar(mapArr, 0, 0, false)
-	fmt.Println(path)
+	AStar(mapArr, Coords{x: 0, y: 0})
 }
+
+func explosionArea(gameMap []string, bombC Coords) map[Coords]bool {
+	explosionArea := map[Coords]bool{
+		bombC: true,
+	}
+	for bCounter := 1; bCounter <= bombRadius; bCounter++ {
+		explCell := Coords{bombC.x - bCounter, bombC.y}
+		if 0 <= explCell.x && gameMap[explCell.y][explCell.x] == '.' {
+			explosionArea[explCell] = true
+		} else {
+			break
+		}
+	}
+
+	for bCounter := 1; bCounter <= bombRadius; bCounter++ {
+		explCell := Coords{bombC.x + bCounter, bombC.y}
+		if explCell.x <= maxX && gameMap[explCell.y][explCell.x] == '.' {
+			explosionArea[explCell] = true
+		} else {
+			break
+		}
+	}
+
+	for bCounter := 1; bCounter <= bombRadius; bCounter++ {
+		explCell := Coords{bombC.x, bombC.y - bCounter}
+		if 0 <= explCell.y && gameMap[explCell.y][explCell.x] == '.' {
+			explosionArea[explCell] = true
+		} else {
+			break
+		}
+	}
+
+	for bCounter := 1; bCounter <= bombRadius; bCounter++ {
+		explCell := Coords{bombC.x, bombC.y + bCounter}
+		if explCell.y <= maxY && gameMap[explCell.y][explCell.x] == '.' {
+			explosionArea[explCell] = true
+		} else {
+			break
+		}
+	}
+
+	return explosionArea
+}
+
+func bfs(gameMap []string, start Coords) (finish Coords) {
+	fmt.Println("Current start point: ", start)
+	visited := map[Coords]bool{
+		start: true,
+	}
+
+	explosive := explosionArea(gameMap, start)
+	fmt.Print("Bomb Hitting Cells: ", explosive)
+
+	queue := []Coords{start}
+
+	counter := 0
+	for len(queue) > 0 {
+
+		fmt.Println("Queue: ", queue)
+		fmt.Println("Visited Coordinates: ", visited)
+		counter++
+
+		coordsDir := []Coords{
+			Coords{x: queue[0].x, y: queue[0].y - 1},
+			Coords{x: queue[0].x, y: queue[0].y + 1},
+			Coords{x: queue[0].x - 1, y: queue[0].y},
+			Coords{x: queue[0].x + 1, y: queue[0].y},
+		}
+
+		finish = queue[0]
+
+		if !explosive[finish] {
+			return finish
+		}
+
+		fmt.Println("Current optimal coord: ", finish)
+
+		queue = queue[1:]
+
+		for _, coord := range coordsDir {
+			if (coord.x >= 0 && coord.x <= maxX) && (coord.y >= 0 && coord.y <= maxY) {
+				if gameMap[coord.y][coord.x] == '.' && !visited[coord] {
+					queue = append(queue, coord)
+					visited[coord] = true
+				}
+			}
+		}
+
+	}
+
+	fmt.Println("Finishing at: ", finish)
+
+	return
+}
+
+// func bfs(start Coords, nodes map[int][]int, fn func (int)) {
+//     frontier := []Coords{start}
+//     visited := map[Coords]bool{}
+//     next := []Coords{}
+
+//     for 0 < len(frontier) {
+//         next = []Coords{}
+//         for _, node := range frontier {
+//             visited[node] = true
+//             for _, n := range bfs_possibles(node, nodes, visited) {
+//                 next = append(next, n)
+//             }
+//         }
+//         frontier = next
+//     }
+// }
+
+// func bfs_possibles(active []Coords, node Coords, visited map[Coords]bool) []Coords {
+//     next := []Coords{}
+//     iter := func (n Coords) bool { _, ok := visited[n]; return !ok }
+//     for _, n := range gameMap {
+//         if iter(n) {
+//             next = append(next, n)
+//         }
+//     }
+//     return next
+// }
+
+// func makeMapArray() (res [][]byte) {
+// 	fileMap, err := ioutil.ReadFile("map1.txt")
+// 	if err != nil {
+// 		log.Println(err)
+// 	}
+// 	temp := []byte{}
+// 	for _, k := range fileMap {
+// 		if k != 10 {
+// 			temp = append(temp, k)
+// 		} else {
+// 			res = append(res, temp)
+// 			temp = []byte{}
+// 		}
+// 	}
+
+// 	return
+// }
