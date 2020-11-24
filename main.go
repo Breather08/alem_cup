@@ -53,9 +53,6 @@ func getResult(checkTile *Tile, mapArr []string) (path []string) {
 	for tile != nil {
 		counter++
 		if len(tile.retreatPath) > 0 {
-			if len(path) > 1 {
-				path = path[:len(path)-1]
-			}
 			path = append(tile.retreatPath, path...)
 		}
 
@@ -80,6 +77,8 @@ func getResult(checkTile *Tile, mapArr []string) (path []string) {
 		}
 
 	}
+
+	fmt.Println(path)
 
 	return
 }
@@ -170,9 +169,9 @@ Loop:
 func (t *Tile) setRetreatPath(mapArr []string) {
 
 	retreatCoord := bfs(mapArr, Coords{x: t.Parent.x, y: t.Parent.y})
-	fmt.Println(retreatCoord)
-	return
-	retreatPath := AStar(mapArr, retreatCoord)
+	// fmt.Println(retreatCoord)
+	// return
+	retreatPath := AStar(mapArr, t.Parent.Coords, retreatCoord)
 	retreat := append([]string{"bomb"}, retreatPath...)
 	retreat = append(retreat, []string{"stay", "stay"}...)
 	retreat = append(retreat, reverse(retreat)...)
@@ -191,7 +190,7 @@ func updateMap(gameMap []string, bombCell Coords) {
 	gameMap[bombCell.y] = replaceAtIndex(gameMap[bombCell.y], '.', bombCell.x)
 }
 
-func AStar(mapArr []string, startCoords Coords) (path []string) {
+func AStar(mapArr []string, startCoords, finishCoords Coords) (path []string) {
 
 	checkTile := &Tile{}
 
@@ -200,10 +199,7 @@ func AStar(mapArr []string, startCoords Coords) (path []string) {
 	}
 
 	finish := &Tile{
-		Coords: Coords{
-			x: maxX,
-			y: maxY,
-		},
+		Coords: finishCoords,
 	}
 
 	start.setDistance(finish.x, finish.y)
@@ -240,7 +236,7 @@ func AStar(mapArr []string, startCoords Coords) (path []string) {
 		}
 	}
 
-	path = getResult(checkTile, mapArr)
+	// path = getResult(checkTile, mapArr)
 
 	fmt.Println(path)
 	return
@@ -248,7 +244,7 @@ func AStar(mapArr []string, startCoords Coords) (path []string) {
 
 func main() {
 	mapArr := makeMapArray()
-	AStar(mapArr, Coords{x: 0, y: 0})
+	AStar(mapArr, Coords{x: 0, y: 0}, Coords{x: maxX, y: maxY})
 }
 
 func explosionArea(gameMap []string, bombC Coords) map[Coords]bool {
