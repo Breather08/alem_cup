@@ -1,6 +1,8 @@
 const maxX = 12,
   maxY = 10,
-  bombRadius = 2;
+  bombRadius = 2,
+  boxCost = 11,
+  step = 1;
 
 const map = `..........;;;
 .!;!;!;!;!;!.
@@ -16,49 +18,22 @@ const map = `..........;;;
   .split("\n")
   .map((item) => item.split(""));
 
-function getNeighbours(current, target) {
-  return [
-    Tile({
-      x: current.x,
-      y: current.y - 1,
-      cost: current.cost + 1,
-      target: target,
-      direction: "up"
-    }),
-    Tile({
-      x: current.x,
-      y: current.y + 1,
-      cost: current.cost + 1,
-      target: target,
-      direction: "down"
-    }),
-    Tile({
-      x: current.x - 1,
-      y: current.y,
-      cost: current.cost + 1,
-      target: target,
-      direction: "left"
-    }),
-    Tile({
-      x: current.x + 1,
-      y: current.y,
-      cost: current.cost + 1,
-      target: target,
-      direction: "right"
-    }),
-  ];
-}
-
 function getDistance(current, target) {
   return Math.abs(target.x - current.x) + Math.abs(target.y - current.y);
 }
 
-function Tile({ x, y, cost = 0, target, parent = null, direction }) {
+function Tile({
+  x,
+  y,
+  cost = 0,
+  target,
+  parent = null,
+  direction,
+  isBox = false,
+}) {
   let distance = 0;
 
-  if (target) {
-    distance = getDistance({ x: x, y: y }, target);
-  }
+  if (target) distance = getDistance({ x: x, y: y }, target);
 
   return {
     x: x,
@@ -67,75 +42,46 @@ function Tile({ x, y, cost = 0, target, parent = null, direction }) {
     distance: distance,
     costDistance: 0,
     parent: parent,
-    direction
+    direction,
+    isBox,
   };
 }
 
-function buildPath(tile) {
-    let path = []
-    while (tile) {
-        map[tile.y][tile.x] = '*'
-        if (tile.direction) path.push(tile.direction)
-        tile = tile.parent
-    }
-    console.log(path.reverse())
-    map.forEach(col => console.log(col.join("")))
-}
-
-function AStar(start, finish) {
-  let visitedTiles = [];
-  let activeTiles = [start];
-
-  while (activeTiles.length > 0) {
-    activeTiles.sort((a, b) => a.costDistance - b.costDistance)
-
-    let current = activeTiles.shift();
-
-    if (current.x === finish.x && current.y === finish.y) {
-      console.log("Path found");
-      buildPath(current)
-      return;
-    }
-
-    let neighbours = getNeighbours(current, finish).filter((nTile) => {
-      if (
-        nTile.x >= 0 &&
-        nTile.x <= maxX &&
-        nTile.y >= 0 &&
-        nTile.y <= maxY &&
-        map[nTile.y][nTile.x] !== "!"
-      ) {
-        return true;
-      }
-      return false;
-    });
-
-    visitedTiles.push(current);
-
-    for (let i = 0; i < neighbours.length; i++) {
-      let nTile = neighbours[i];
-      if (
-        visitedTiles.some((vTile) => vTile.x === nTile.x && vTile.y === nTile.y)
-      ) {
-        continue;
-      }
-
-      if (map[nTile.y][nTile.x] === ";") {
-        nTile.cost += 10;
-      }
-
-      nTile.costDistance = nTile.cost + nTile.distance;
-      nTile.parent = current;
-
-      activeTiles.push(nTile);
-    }
-  }
-  console.log("Failed");
-  return;
+function getNeighbours(current, target) {
+  return [
+    Tile({
+      x: current.x,
+      y: current.y - step,
+      cost: current.cost + step,
+      target: target,
+      direction: "up",
+    }),
+    Tile({
+      x: current.x,
+      y: current.y + step,
+      cost: current.cost + step,
+      target: target,
+      direction: "down",
+    }),
+    Tile({
+      x: current.x - step,
+      y: current.y,
+      cost: current.cost + step,
+      target: target,
+      direction: "left",
+    }),
+    Tile({
+      x: current.x + step,
+      y: current.y,
+      cost: current.cost + step,
+      target: target,
+      direction: "right",
+    }),
+  ];
 }
 
 function findSafeCoord(start) {
-  function explosiveCells(bombCoords) {
+  const explosiveCells = (bombCoords) => {
     let explosives = [bombCoords];
 
     // Check Left
@@ -194,13 +140,13 @@ function findSafeCoord(start) {
       }
     }
     return explosives;
-  }
+  };
 
-  function checkFunc(arr, coord) {
+  const checkFunc = (arr, coord) => {
     return !arr.some((item) => item.x === coord.x && item.y === coord.y);
-  }
+  };
 
-  function safeCoord(start) {
+  const safeCoord = (start) => {
     const explosives = explosiveCells(start);
 
     let visited = [start];
@@ -214,11 +160,9 @@ function findSafeCoord(start) {
 
       finish = current;
 
-      if (checkFunc(explosives, finish)) {
-        return finish;
-      }
+      if (checkFunc(explosives, finish)) return finish;
 
-      neighbours.forEach((coord, i) => {
+      neighbours.forEach((coord) => {
         if (
           coord.x >= 0 &&
           coord.x <= maxX &&
@@ -232,16 +176,86 @@ function findSafeCoord(start) {
         }
       });
     }
-  }
+  };
 
   return safeCoord(start);
 }
 
-function main() {
-  const finish = Tile({ x: 7, y: 2 });
-  const start = Tile({ x: 8, y: 4, target: finish });
+function buildPath(tile) {
+  let path = [];
+  while (tile) {
+    map[tile.y][tile.x] = "*";
+    if (tile.direction) path.push(tile.direction);
+    if (tile.isBox) {
+      console.log(tile.x, tile.y)
+    }
+    tile = tile.parent;
 
-  AStar(start, finish);
+  }
+  console.log(path.reverse());
+  map.forEach((col) => console.log(col.join("")));
+}
+
+function astar(start, finish) {
+  let visitedTiles = [];
+  let activeTiles = [start];
+
+  while (activeTiles.length > 0) {
+    activeTiles.sort((a, b) => a.costDistance - b.costDistance);
+
+    let current = activeTiles.shift();
+
+    if (current.x === finish.x && current.y === finish.y) {
+      console.log("Path found");
+      buildPath(current);
+      return;
+    }
+
+    let neighbours = getNeighbours(current, finish).filter((nTile) => {
+      if (
+        nTile.x >= 0 &&
+        nTile.x <= maxX &&
+        nTile.y >= 0 &&
+        nTile.y <= maxY &&
+        map[nTile.y][nTile.x] !== "!"
+      ) {
+        return true;
+      }
+      return false;
+    });
+
+    visitedTiles.push(current);
+
+    for (let i = 0; i < neighbours.length; i++) {
+      let nTile = neighbours[i];
+
+      if (map[nTile.y][nTile.x] === ";") nTile.isBox = true;
+
+      if (
+        visitedTiles.some((vTile) => vTile.x === nTile.x && vTile.y === nTile.y)
+      ) {
+        continue;
+      }
+
+      if (map[nTile.y][nTile.x] === ";") {
+        nTile.cost += boxCost;
+      }
+
+      nTile.costDistance = nTile.cost + nTile.distance;
+      nTile.parent = current;
+
+      activeTiles.push(nTile);
+    }
+  }
+  console.log("Failed");
+  return;
+}
+
+function main() {
+  const finish = Tile({ x: 12, y: 10 });
+  const start = Tile({ x: 0, y: 0, target: finish });
+
+  astar(start, finish);
 }
 
 main();
