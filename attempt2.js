@@ -4,6 +4,27 @@ const maxX = 12,
   boxCost = 11,
   step = 1;
 
+const oppositeDirs = {
+  left: "right",
+  right: "left",
+  up: "down",
+  down: "up",
+};
+
+const printMap = `..........;;;
+.!;!;!;!;!;!.
+;..........;!
+;!;!;!;!;!!!.
+;..;.....;..;
+.!;!;!;!;!;!;
+;....;.;.;!.;
+;!.!;!;!;!.!.
+;.;.;....;!..
+.!!!.!;!;!.!;
+.;...;;;...;;`
+  .split("\n")
+  .map((item) => item.split(""));
+
 const map = `..........;;;
 .!;!;!;!;!;!.
 ;..........;!
@@ -81,7 +102,7 @@ function getNeighbours(current, target) {
 }
 
 function findSafeCoord(start) {
-  const explosiveCells = (bombCoords) => {
+  function explosiveCells(bombCoords) {
     let explosives = [bombCoords];
 
     // Check Left
@@ -140,13 +161,13 @@ function findSafeCoord(start) {
       }
     }
     return explosives;
-  };
+  }
 
-  const checkFunc = (arr, coord) => {
+  function checkFunc(arr, coord) {
     return !arr.some((item) => item.x === coord.x && item.y === coord.y);
-  };
+  }
 
-  const safeCoord = (start) => {
+  function safeCoord(start) {
     const explosives = explosiveCells(start);
 
     let visited = [start];
@@ -160,7 +181,9 @@ function findSafeCoord(start) {
 
       finish = current;
 
-      if (checkFunc(explosives, finish)) return finish;
+      if (checkFunc(explosives, finish)) {
+        return finish;
+      }
 
       neighbours.forEach((coord) => {
         if (
@@ -176,27 +199,54 @@ function findSafeCoord(start) {
         }
       });
     }
-  };
+  }
 
   return safeCoord(start);
 }
 
-function buildPath(tile) {
+function buildPath(tile, retreat) {
   let path = [];
   while (tile) {
-    map[tile.y][tile.x] = "*";
-    if (tile.direction) path.push(tile.direction);
-    if (tile.isBox) {
-      console.log(tile.x, tile.y)
+    if (!retreat && !tile.parent.parent) {
+      // Box case
+      if (tile.isBox) {
+
+        let retreatCoord = findSafeCoord(
+          Tile({ x: tile.parent.x, y: tile.parent.y })
+        );
+
+        let start = Tile({
+          x: tile.parent.x,
+          y: tile.parent.y,
+          target: retreatCoord,
+        });
+
+        map[tile.y][tile.x] = '.'
+        printMap[tile.y][tile.x] = '.'
+
+        [path, tile] = astar(start, retreatCoord, true);
+        return [path, retreatCoord];
+
+      }
+      // Regular case
+      console.log('Regular move')
+      printMap[tile.y][tile.x] = "*";
+      path.push(tile.direction);
+      return [path, tile];
+    } else {
+      if (tile.direction) path.unshift(tile.direction)
     }
     tile = tile.parent;
-
   }
-  console.log(path.reverse());
-  map.forEach((col) => console.log(col.join("")));
+
+  // Retreat path building case
+  
+  path.unshift("bomb");
+  path.push(path.length === bombRadius + 1 ? "stay" : "stay", "stay");
+  return [path, tile];
 }
 
-function astar(start, finish) {
+function astar(start, finish, retreat) {
   let visitedTiles = [];
   let activeTiles = [start];
 
@@ -207,8 +257,7 @@ function astar(start, finish) {
 
     if (current.x === finish.x && current.y === finish.y) {
       console.log("Path found");
-      buildPath(current);
-      return;
+      return buildPath(current, retreat);
     }
 
     let neighbours = getNeighbours(current, finish).filter((nTile) => {
@@ -253,11 +302,18 @@ function astar(start, finish) {
 
 function main() {
   const finish = Tile({ x: 12, y: 10 });
-  const start = Tile({ x: 0, y: 0, target: finish });
+  let start = Tile({ x: 0, y: 0, target: finish });
+  // console.log(findSafeCoord(Tile({ x: 8, y: 0 })))
+  // return
+  setInterval(() => {
+    console.clear();
 
-  astar(start, finish);
+    let [path, tile] = astar(start, finish, (retreat = false));
+
+    start = Tile({ x: tile.x, y: tile.y, target: finish });
+    printMap.forEach((col) => console.log(col.join("")));
+    console.log(path);
+  }, 200);
 }
 
 main();
-
-// console.log(findSafeCoord({ x: 0, y: 1 }));
