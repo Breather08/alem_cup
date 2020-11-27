@@ -13,7 +13,7 @@ const oppositeDirs = {
 
 const printMap = `..........;;;
 .!;!;!;!;!;!.
-;..........;!
+;.......;..;!
 ;!;!;!;!;!!!.
 ;..;.....;..;
 .!;!;!;!;!;!;
@@ -27,7 +27,7 @@ const printMap = `..........;;;
 
 const map = `..........;;;
 .!;!;!;!;!;!.
-;..........;!
+;.......;..;!
 ;!;!;!;!;!!!.
 ;..;.....;..;
 .!;!;!;!;!;!;
@@ -101,6 +101,10 @@ function getNeighbours(current, target) {
   ];
 }
 
+function contains(arr, coord) {
+  return arr.some((item) => item.x === coord.x && item.y === coord.y);
+}
+
 function findSafeCoord(start) {
   function explosiveCells(bombCoords) {
     let explosives = [bombCoords];
@@ -163,13 +167,9 @@ function findSafeCoord(start) {
     return explosives;
   }
 
-  function checkFunc(arr, coord) {
-    return !arr.some((item) => item.x === coord.x && item.y === coord.y);
-  }
+  const explosives = explosiveCells(start);
 
-  function safeCoord(start) {
-    const explosives = explosiveCells(start);
-
+  function bfs(start, checker) {
     let visited = [start];
     let queue = [start];
     let finish;
@@ -181,7 +181,7 @@ function findSafeCoord(start) {
 
       finish = current;
 
-      if (checkFunc(explosives, finish)) {
+      if (checker(finish)) {
         return finish;
       }
 
@@ -192,16 +192,132 @@ function findSafeCoord(start) {
           coord.y >= 0 &&
           coord.y <= maxY
         ) {
-          if (map[coord.y][coord.x] === "." && checkFunc(visited, coord)) {
+          if (map[coord.y][coord.x] === "." && !contains(visited, coord)) {
             queue.push(coord);
             visited.push(coord);
           }
         }
       });
     }
+    console.error("Failed");
+    return;
   }
 
-  return safeCoord(start);
+  return bfs(start, (finish) => !contains(explosives, finish));
+}
+
+function findClosestBox(start) {
+  function closestBoxes(current) {
+    let boxes = [];
+
+    // Check Left
+    for (let bCounter = 1; bCounter <= bombRadius; bCounter++) {
+      let boxCell = {
+        x: current.x - bCounter,
+        y: current.y,
+      };
+
+      if (0 <= boxCell.x) {
+        if (map[boxCell.y][boxCell.x] === ";") {
+          boxes.push(boxCell);
+          break;
+        } else if (map[boxCell.y][boxCell.x] === "!") {
+          break;
+        }
+      }
+    }
+
+    // Check Right
+    for (let bCounter = 1; bCounter <= bombRadius; bCounter++) {
+      let boxCell = {
+        x: current.x + bCounter,
+        y: current.y,
+      };
+
+      if (boxCell.x <= maxX) {
+        if (map[boxCell.y][boxCell.x] === ";") {
+          boxes.push(boxCell);
+          break;
+        } else if (map[boxCell.y][boxCell.x] === "!") {
+          break;
+        }
+      }
+    }
+
+    // Check Up
+    for (let bCounter = 1; bCounter <= bombRadius; bCounter++) {
+      let boxCell = {
+        x: current.x,
+        y: current.y - bCounter,
+      };
+
+      if (0 <= boxCell.y) {
+        if (map[boxCell.y][boxCell.x] === ";") {
+          boxes.push(boxCell);
+          break;
+        } else if (map[boxCell.y][boxCell.x] === "!") {
+          break;
+        }
+      }
+    }
+
+    // Check Down
+    for (let bCounter = 1; bCounter <= bombRadius; bCounter++) {
+      let boxCell = {
+        x: current.x,
+        y: current.y + bCounter,
+      };
+
+      if (boxCell.y <= maxY) {
+        if (map[boxCell.y][boxCell.x] === ";") {
+          boxes.push(boxCell);
+          break;
+        } else if (map[boxCell.y][boxCell.x] === "!") {
+          break;
+        }
+      }
+    }
+    return boxes;
+  }
+
+  let finish;
+
+  function bfs(start) {
+    let visited = [start];
+    let queue = [start];
+    let len = 0;
+
+    while (queue.length > 0) {
+      let current = queue.shift();
+
+      const neighbours = getNeighbours(current);
+      const boxes = closestBoxes(current);
+
+      if (boxes.length > len) {
+        len = boxes.length;
+        finish = current;
+      }
+
+      if (len === 3) return finish;
+
+      neighbours.forEach((coord) => {
+        if (
+          coord.x >= 0 &&
+          coord.x <= maxX &&
+          coord.y >= 0 &&
+          coord.y <= maxY
+        ) {
+          if (map[coord.y][coord.x] === "." && !contains(visited, coord)) {
+            queue.push(coord);
+            visited.push(coord);
+          }
+        }
+      });
+    }
+    return finish;
+  }
+
+  return bfs(start);
 }
 
 function buildPath(tile, retreat) {
@@ -291,19 +407,18 @@ function astar(start, finish, retreat) {
 }
 
 function main() {
-  const finish = Tile({ x: 12, y: 10 });
+  let finish = Tile({ x: 12, y: 10 });
   let start = Tile({ x: 0, y: 0, target: finish });
-  // console.log(findSafeCoord(Tile({ x: 8, y: 0 })))
-  // return
+  // console.log(findClosestBox(Tile({ x: 0, y: 0 })));
+  // return;
   setInterval(() => {
     console.clear();
-
+    finish = findClosestBox(start)
     let [path, tile] = astar(start, finish, (retreat = false));
-
     start = Tile({ x: tile.x, y: tile.y, target: finish });
     printMap.forEach((col) => console.log(col.join("")));
     // console.log(path);
-  }, 200);
+  }, 1000);
 }
 
 main();
