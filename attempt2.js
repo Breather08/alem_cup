@@ -13,7 +13,7 @@ const oppositeDirs = {
 
 const printMap = `..........;;;
 .!;!;!;!;!;!.
-;.......;..;!
+;..........;!
 ;!;!;!;!;!!!.
 ;..;.....;..;
 .!;!;!;!;!;!;
@@ -27,7 +27,7 @@ const printMap = `..........;;;
 
 const map = `..........;;;
 .!;!;!;!;!;!.
-;.......;..;!
+;..........;!
 ;!;!;!;!;!!!.
 ;..;.....;..;
 .!;!;!;!;!;!;
@@ -206,7 +206,7 @@ function findSafeCoord(start) {
   return bfs(start, (finish) => !contains(explosives, finish));
 }
 
-function findClosestBox(start) {
+function findClosestBoxes(start) {
   function closestBoxes(current) {
     let boxes = [];
 
@@ -280,7 +280,7 @@ function findClosestBox(start) {
     return boxes;
   }
 
-  let finish;
+  let finish, finBoxes;
 
   function bfs(start) {
     let visited = [start];
@@ -294,11 +294,10 @@ function findClosestBox(start) {
       const boxes = closestBoxes(current);
 
       if (boxes.length > len) {
+        finBoxes = boxes;
         len = boxes.length;
         finish = current;
       }
-
-      if (len === 3) return finish;
 
       neighbours.forEach((coord) => {
         if (
@@ -314,42 +313,27 @@ function findClosestBox(start) {
         }
       });
     }
-    return finish;
+    return {
+      coord: finish,
+      boxes: finBoxes,
+    };
   }
 
   return bfs(start);
 }
 
-function buildPath(tile, retreat) {
+function buildPath(tile) {
   let path = [];
   while (tile.parent) {
-    if (!retreat && !tile.parent.parent) {
-      // Box case
-      if (tile.isBox) {
-        let retreatCoord = findSafeCoord(
-          Tile({ x: tile.parent.x, y: tile.parent.y })
-        );
-
-        map[tile.y][tile.x] = ".";
-        printMap[tile.y][tile.x] = ".";
-        [path, tile] = astar(tile.parent, retreatCoord, true);
-        return [path, retreatCoord];
-      }
-
-      console.log("Regular move");
-      printMap[tile.y][tile.x] = "*";
-      path.push(tile.direction);
-      return [path, tile];
-    }
-
+    printMap[tile.y][tile.x] = "*";
     if (tile.direction) path.unshift(tile.direction);
     tile = tile.parent;
   }
 
   // Retreat path building case
-  path.unshift("bomb");
-  path.push(path.length === bombRadius + 1 ? "stay" : "stay", "stay");
-  return [path, tile];
+  // path.unshift("bomb");
+  // path.push(path.length === bombRadius + 1 ? "stay" : "stay", "stay");
+  return path;
 }
 
 function astar(start, finish, retreat) {
@@ -411,14 +395,45 @@ function main() {
   let start = Tile({ x: 0, y: 0, target: finish });
   // console.log(findClosestBox(Tile({ x: 0, y: 0 })));
   // return;
+
   setInterval(() => {
     console.clear();
-    finish = findClosestBox(start)
-    let [path, tile] = astar(start, finish);
-    start = Tile({ x: tile.x, y: tile.y, target: finish });
+    // Find destination
+    finish = findClosestBoxes(start);
+    // return
+
+    // Build path
+    let path = astar(start, finish.coord);
+
+    // Find bomb safe cell
+    let safeCoord = findSafeCoord(finish.coord);
+
+    // Build retreat path
+    let retreatPath = astar(finish.coord, safeCoord);
+
+    // Set bomb
+    path.push("bomb");
+    path = [...path, ...retreatPath];
+    path.push("stay", "stay");
+    if (retreatPath.length <= bombRadius) path.push("stay");
+
+    // Update map
+    finish.boxes.forEach((box) => {
+      map[box.y][box.x] = ".";
+      printMap[box.y][box.x] = ".";
+    });
+
+    // Update start point
+    start = Tile({ x: safeCoord.x, y: safeCoord.y, target: finish });
+
+    // Print map
     printMap.forEach((col) => console.log(col.join("")));
+
+    // console.log(start)
+    // Do this again
+
     // console.log(path);
-  }, 1000);
+  }, 2000);
 }
 
 main();
