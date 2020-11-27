@@ -206,41 +206,31 @@ function findSafeCoord(start) {
 
 function buildPath(tile, retreat) {
   let path = [];
-  while (tile) {
+  while (tile.parent) {
     if (!retreat && !tile.parent.parent) {
       // Box case
       if (tile.isBox) {
-
         let retreatCoord = findSafeCoord(
           Tile({ x: tile.parent.x, y: tile.parent.y })
         );
 
-        let start = Tile({
-          x: tile.parent.x,
-          y: tile.parent.y,
-          target: retreatCoord,
-        });
-
-        map[tile.y][tile.x] = '.'
-        printMap[tile.y][tile.x] = '.'
-
-        [path, tile] = astar(start, retreatCoord, true);
+        map[tile.y][tile.x] = ".";
+        printMap[tile.y][tile.x] = ".";
+        [path, tile] = astar(tile.parent, retreatCoord, true);
         return [path, retreatCoord];
-
       }
-      // Regular case
-      console.log('Regular move')
+
+      console.log("Regular move");
       printMap[tile.y][tile.x] = "*";
       path.push(tile.direction);
       return [path, tile];
-    } else {
-      if (tile.direction) path.unshift(tile.direction)
     }
+
+    if (tile.direction) path.unshift(tile.direction);
     tile = tile.parent;
   }
 
   // Retreat path building case
-  
   path.unshift("bomb");
   path.push(path.length === bombRadius + 1 ? "stay" : "stay", "stay");
   return [path, tile];
@@ -312,7 +302,7 @@ function main() {
 
     start = Tile({ x: tile.x, y: tile.y, target: finish });
     printMap.forEach((col) => console.log(col.join("")));
-    console.log(path);
+    // console.log(path);
   }, 200);
 }
 
