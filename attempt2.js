@@ -414,7 +414,7 @@ function main() {
   setInterval(() => {
     console.clear();
     finish = findClosestBox(start)
-    let [path, tile] = astar(start, finish, (retreat = false));
+    let [path, tile] = astar(start, finish);
     start = Tile({ x: tile.x, y: tile.y, target: finish });
     printMap.forEach((col) => console.log(col.join("")));
     // console.log(path);
