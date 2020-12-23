@@ -39,11 +39,10 @@ const map = `..........;;;
   .split("\n")
   .map((item) => item.split(""));
 
-function getDistance(current, target) {
-  return Math.abs(target.x - current.x) + Math.abs(target.y - current.y);
-}
+const getDistance = (current, target) =>
+  Math.abs(target.x - current.x) + Math.abs(target.y - current.y);
 
-function Tile({
+const Tile = ({
   x,
   y,
   cost = 0,
@@ -51,7 +50,7 @@ function Tile({
   parent = null,
   direction,
   isBox = false,
-}) {
+}) => {
   let distance = 0;
 
   if (target) distance = getDistance({ x: x, y: y }, target);
@@ -66,9 +65,9 @@ function Tile({
     direction,
     isBox,
   };
-}
+};
 
-function getNeighbours(current, target) {
+const getNeighbours = (current, target) => {
   return [
     Tile({
       x: current.x,
@@ -99,14 +98,13 @@ function getNeighbours(current, target) {
       direction: "right",
     }),
   ];
-}
+};
 
-function contains(arr, coord) {
-  return arr.some((item) => item.x === coord.x && item.y === coord.y);
-}
+const contains = (arr, coord) =>
+  arr.some((item) => item.x === coord.x && item.y === coord.y);
 
-function findSafeCoord(start) {
-  function explosiveCells(bombCoords) {
+const findSafeCoord = (start) => {
+  const explosiveCells = (bombCoords) => {
     let explosives = [bombCoords];
 
     // Check Left
@@ -165,11 +163,11 @@ function findSafeCoord(start) {
       }
     }
     return explosives;
-  }
+  };
 
   const explosives = explosiveCells(start);
 
-  function bfs(start, checker) {
+  const bfs = (start, checker) => {
     let visited = [start];
     let queue = [start];
     let finish;
@@ -201,13 +199,13 @@ function findSafeCoord(start) {
     }
     console.error("Failed");
     return;
-  }
+  };
 
   return bfs(start, (finish) => !contains(explosives, finish));
-}
+};
 
-function findClosestBoxes(start) {
-  function closestBoxes(current) {
+const findClosestBoxes = (start) => {
+  const closestBoxes = (current) => {
     let boxes = [];
 
     // Check Left
@@ -278,11 +276,11 @@ function findClosestBoxes(start) {
       }
     }
     return boxes;
-  }
+  };
 
   let finish, finBoxes;
 
-  function bfs(start) {
+  const bfs = (start) => {
     let visited = [start];
     let queue = [start];
     let len = 0;
@@ -317,12 +315,12 @@ function findClosestBoxes(start) {
       coord: finish,
       boxes: finBoxes,
     };
-  }
+  };
 
   return bfs(start);
-}
+};
 
-function buildPath(tile) {
+const buildPath = (tile) => {
   let path = [];
   while (tile.parent) {
     printMap[tile.y][tile.x] = "*";
@@ -334,9 +332,9 @@ function buildPath(tile) {
   // path.unshift("bomb");
   // path.push(path.length === bombRadius + 1 ? "stay" : "stay", "stay");
   return path;
-}
+};
 
-function astar(start, finish, retreat) {
+const astar = (start, finish, retreat) => {
   let visitedTiles = [];
   let activeTiles = [start];
 
@@ -388,9 +386,9 @@ function astar(start, finish, retreat) {
   }
   console.log("Failed");
   return;
-}
+};
 
-function main() {
+const main = () => {
   let finish = Tile({ x: 12, y: 10 });
   let start = Tile({ x: 0, y: 0, target: finish });
   // console.log(findClosestBox(Tile({ x: 0, y: 0 })));
@@ -434,6 +432,6 @@ function main() {
 
     // console.log(path);
   }, 2000);
-}
+};
 
 main();
